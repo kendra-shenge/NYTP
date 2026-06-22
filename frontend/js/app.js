@@ -39,7 +39,6 @@ function insightBox(text) {
     return `<div style="background:#f0f7ff;border:1px solid #dbeafe;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.85rem;color:#1e40af;line-height:1.6">${text}</div>`;
 }
 
-// ---- Overview ----
 async function renderOverview() {
     const el = document.getElementById('page-overview');
     el.innerHTML = '<div class="loading">Loading...</div>';
@@ -68,7 +67,6 @@ async function renderOverview() {
         createBarChart('chart-monthly-revenue', monthly.map(d => d.month), monthly.map(d => d.revenue), 'Revenue ($)', '#10b981');
         createHorizBarChart('chart-borough', revenue.map(d => d.borough), revenue.map(d => d.revenue), 'Revenue ($)');
 
-        // Insight annotations
         const maxHour = hourly.reduce((a, b) => a.trip_count > b.trip_count ? a : b);
         const maxDay = daily.reduce((a, b) => a.trip_count > b.trip_count ? a : b);
         const topBorough = revenue.reduce((a, b) => a.revenue > b.revenue ? a : b);
@@ -90,7 +88,6 @@ async function renderOverview() {
     }
 }
 
-// ---- Locations ----
 async function renderLocations() {
     const el = document.getElementById('page-locations');
     el.innerHTML = '<div class="loading">Loading...</div>';
@@ -122,7 +119,6 @@ async function renderLocations() {
         const routeLabels = routes.map(r => r.pickup_zone + ' -> ' + r.dropoff_zone);
         createHorizBarChart('chart-routes', routeLabels, routes.map(r => r.trip_count), 'Trips');
 
-        // Insight
         const topR = routes[0];
         if (topR) {
             const insight = document.createElement('div');
@@ -135,7 +131,6 @@ async function renderLocations() {
     }
 }
 
-// ---- Financial ----
 async function renderFinancial() {
     const el = document.getElementById('page-financial');
     el.innerHTML = '<div class="loading">Loading...</div>';
@@ -144,11 +139,10 @@ async function renderFinancial() {
         const [payment, tip, distance, vendor] = await Promise.all([
             apiFetch('/api/payment-types'),
             apiFetch('/api/tip-analysis'),
-            apiFetch('/api/trips-by-hour'), // reuse for distance bins
-            apiFetch('/api/trips-by-hour'), // placeholder
+            apiFetch('/api/trips-by-hour'),
+            apiFetch('/api/trips-by-hour'),
         ]);
 
-        // Get distance bins separately
         const tripKpi = await apiFetch('/api/kpi');
 
         let html = '<div class="chart-grid">';
@@ -165,8 +159,7 @@ async function renderFinancial() {
         createPieChart('chart-payment-revenue', payment.map(d => d.payment_type_name), payment.map(d => d.revenue), payColors);
         createBarChart('chart-tip', tip.map(d => d.tip_bucket), tip.map(d => d.count), 'Trips', '#8b5cf6');
 
-        // Vendor data
-        const vendorResp = await apiFetch('/api/top-pickup-locations?limit=1'); // just get vendor from kpi
+        const vendorResp = await apiFetch('/api/top-pickup-locations?limit=1');
         const creditCardPct = (payment.find(p => p.payment_type_name === 'Credit Card')?.count / payment.reduce((s, p) => s + p.count, 0) * 100).toFixed(0);
         const noTipPct = (tip.find(t => t.tip_bucket === 'No Tip')?.count / tip.reduce((s, t) => s + t.count, 0) * 100).toFixed(0);
 
@@ -182,13 +175,11 @@ async function renderFinancial() {
     }
 }
 
-// ---- Explore ----
 let exploreLocations = [];
 
 async function renderExplore() {
     const el = document.getElementById('page-explore');
 
-    // Load locations for dropdowns
     try {
         const [pickup, _dropoff] = await Promise.all([
             apiFetch('/api/top-pickup-locations?limit=200'),
@@ -199,7 +190,6 @@ async function renderExplore() {
         _dropoff.forEach(d => locSet.add(JSON.stringify({ id: 0, name: d.zone + ' (' + d.borough + ')' })));
         exploreLocations = Array.from(locSet).map(s => JSON.parse(s));
     } catch (e) {
-        // continue with empty
     }
 
     const today = '2019-12-31';
@@ -287,7 +277,6 @@ async function applyExploreFilters() {
     }
 }
 
-// ---- Pipeline Log ----
 async function renderPipelineLog() {
     const el = document.getElementById('page-pipeline');
     el.innerHTML = '<div class="loading">Loading...</div>';
@@ -313,7 +302,6 @@ async function renderPipelineLog() {
     }
 }
 
-// ---- Navigation hook ----
 const originalShowPage = showPage;
 showPage = function(pageId) {
     originalShowPage(pageId);
@@ -326,7 +314,6 @@ showPage = function(pageId) {
     }
 };
 
-// ---- Init ----
 (async function init() {
     try {
         const count = await apiFetch('/api/trip-count');

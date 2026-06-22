@@ -1,9 +1,18 @@
 # NYC Taxi Trip Analyzer
 
-A full-stack data analytics dashboard for exploring NYC taxi trip data (2019), built with:
-- **Backend**: Raw Python (stdlib `http.server`, no frameworks)
-- **Frontend**: HTML, CSS, JavaScript + Chart.js
-- **Database**: SQLite (MySQL-ready schema provided)
+A full-stack analytics dashboard for exploring New York City taxi trips from 2019. This project combines a lightweight Python backend, a browser-based frontend, and a normalized SQLite dataset with a MySQL-ready schema.
+
+## Links
+- Scrumboard: _TODO_
+- Participation sheet: https://docs.google.com/spreadsheets/d/1IqUfeTE-UAdMirhrYXWT4rBRgdkrR49XH9G579nJivI/edit?usp=sharing
+- Website: _TODO_
+- Walkthrough video: _TODO_
+
+## What this project includes
+- **Backend**: Raw Python using the standard library (`http.server`), no web framework required
+- **Frontend**: HTML, CSS, JavaScript, and Chart.js for interactive visualizations
+- **Database**: SQLite with a normalized schema, ready for MySQL migration if needed
+- **ETL pipeline**: Data cleaning, validation, and bulk loading into a star-schema-style model
 
 ## System Architecture
 
@@ -16,13 +25,13 @@ A full-stack data analytics dashboard for exploring NYC taxi trip data (2019), b
           v                                   v
 +-------------------+          +---------------------------+
 |  Backend REST API |          |  Static File Server       |
-|  /api/* endpoints |          |  serves frontend/         |
+|  /api/* endpoints |          |  serves frontend assets   |
 +-------------------+          +---------------------------+
           |
-          | SQLAlchemy / SQL
+          | SQL / Database access
           v
 +------------------------------------------------------------------+
-|                     SQLite Database (nytp.db)                     |
+|                    Database (nytp.db / MySQL-ready)               |
 |  +---------------+  +---------------+  +------------------------+ |
 |  | dim_vendor    |  | dim_location  |  | fact_trip              | |
 |  | dim_rate_code |  | dim_payment   |  | (7.6M rows, indexed)   | |
@@ -38,217 +47,53 @@ A full-stack data analytics dashboard for exploring NYC taxi trip data (2019), b
           ^
           |
 +------------------------------------------------------------------+
-|  CSV: yellow_tripdata_2019.csv (raw)    taxi_zone_lookup.csv     |
-|  Shapefile: taxi_zones/ (GeoJSON boundaries)                     |
+|  Raw source files:                                               |
+|  yellow_tripdata_2019.csv     taxi_zone_lookup.csv               |
+|  taxi_zones/ (GeoJSON boundaries)                                |
 +------------------------------------------------------------------+
 ```
-
-## Project Structure
-
-```
-nytp/
-├── backend/
-│   ├── server.py              # HTTP server (stdlib only - no Flask/Django)
-│   └── src/
-│       ├── database/
-│       │   ├── connection.py   # DB connection (SQLite/MySQL)
-│       │   └── schema.py       # Relational schema (5 tables, 7 indexes)
-│       ├── pipeline/
-│       │   ├── clean.py        # Data cleaning, validation, 8 derived features
-│       │   └── load.py         # ETL pipeline (bulk insert)
-│       ├── queries/
-│       │   └── analytics.py    # 15 analytical SQL queries
-│       └── utils/
-│           └── algorithms.py   # Custom merge sort + IQR outlier detection
-├── frontend/
-│   ├── index.html              # SPA dashboard (5 pages)
-│   ├── css/style.css           # Clean, responsive styles
-│   └── js/
-│       ├── app.js              # Page routing, rendering, filters
-│       ├── api.js              # Fetch-based API client
-│       └── charts.js           # Chart.js wrapper (bar, line, pie, horizontal)
-├── taxi_zones/                 # Shapefile spatial boundaries
-├── yellow_tripdata_2019.csv    # Raw trip data (7.6M rows, ~766 MB)
-├── taxi_zone_lookup.csv        # Location dimension (265 zones)
-├── mysql_schema.sql            # MySQL schema dump
-├── requirements.txt
-└── README.md
-```
-
-## Database Schema (Normalized Star Schema)
-
-**Dimension Tables:**
-- `dim_vendor` (vendor_id PK, vendor_name) -- 3 vendors
-- `dim_rate_code` (rate_code_id PK, rate_code_name) -- 7 rate codes
-- `dim_payment_type` (payment_type_id PK, payment_type_name) -- 6 payment types
-- `dim_location` (location_id PK, borough, zone, service_zone) -- 265 NYC zones
-
-**Fact Table:**
-- `fact_trip` (trip_id PK, vendor_id FK, pulocation_id FK, dolocation_id FK, rate_code_id FK, payment_type_id FK, timestamps, distance, fares, tips, 8 derived features)
-- Indexed on: pickup datetime, PU/DOLocationID, vendor, rate code, payment type
-
-### Derived Features (8 engineered columns)
-
-| Feature | Formula | Justification |
-|---|---|---|
-| `trip_duration_minutes` | `dropoff - pickup` | Essential for understanding trip lengths and traffic patterns; enables speed calculation |
-| `speed_mph` | `distance / (duration / 60)` | Key mobility metric; identifies congested vs. efficient routes; outliers indicate data errors or extreme traffic |
-| `tip_percentage` | `(tip_amount / fare_amount) * 100` | Economic insight into rider behavior; correlates with service quality, ride purpose, and borough wealth |
-| `hour_of_day` | Extracted from pickup | Captures diurnal mobility patterns; peak hours, late-night activity, airport rush timing |
-| `is_weekend` | 1 if Sat/Sun | Separates commuter vs. leisure travel patterns |
-| `day_of_week` | 0=Mon through 6=Sun | Enables weekday-by-weekday comparison for weekly rhythm analysis |
-| `month` | 1-12 | Captures seasonal variation in tourism, weather, and holidays |
-| `revenue_per_mile` | `total_amount / distance` | Driver economics metric; compares profitability of short vs. long trips, borough-to-borough variations |
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.10 or newer
 - pip
 
 ### Installation
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
-# Start the backend server (serves both API and frontend)
-cd backend && python3 server.py
+# Start the backend server
+cd backend && python server.py
 
-# Open in browser:
+# Open the app in your browser
 # http://localhost:8000
 ```
-
-The database at `nytp.db` already contains 2.7M cleaned trip records. To reload or add more data:
-
-```bash
-cd backend
-python3 -c "from src.pipeline.load import run_pipeline; run_pipeline(max_chunks=None)"
-```
-
-To use MySQL instead of SQLite, edit `backend/src/database/connection.py` and switch to `get_mysql_engine()`, then run `mysql_schema.sql`.
-
-## Data Cleaning & Integrity
-
-| Check | Action | Records Affected (est.) |
-|---|---|---|
-| Missing/invalid timestamps | Remove record | ~0.1% |
-| Dropoff before pickup | Remove record | ~0.3% |
-| Negative passenger count | Remove record | ~0.01% |
-| Negative distance/fare | Remove record | ~0.5% |
-| Distance > 100 miles | Remove (outlier) | ~0.01% |
-| Fare > $500 | Remove (outlier) | ~0.02% |
-| Total amount > $1000 | Remove (outlier) | ~0.01% |
-| Invalid location ID (< 1 or > 265) | Remove record | ~0.1% |
-| Unknown vendor/rate codes | Map to "Unknown" | ~1.2% |
-
-**Assumptions:**
-- Records with zero distance but positive fare are kept (short trips with minimum fare)
-- Congestion surcharge of $0.00 is valid (trips outside congestion zone hours or before surcharge start)
-- Store-and-forward flag is preserved for informational purposes
-- Location IDs 264 (Unknown) and 265 (Outside NYC) are valid zone entries
-
-Cleaning log viewable in the dashboard's Data Log tab.
-
-## Custom Algorithms
-
-### Merge Sort (`backend/src/utils/algorithms.py`)
-
-Manual implementation of merge sort for ranking top routes by trip count.
-
-```
-function merge_sort(arr, key, reverse=False):
-    if len(arr) <= 1: return arr
-    mid = len(arr) // 2
-    left = merge_sort(arr[:mid], key, reverse)
-    right = merge_sort(arr[mid:], key, reverse)
-    return merge(left, right, key, reverse)
-
-function merge(left, right, key, reverse):
-    result = []
-    while i < len(left) and j < len(right):
-        if reverse: compare = key(left[i]) >= key(right[j])
-        else:       compare = key(left[i]) <= key(right[j])
-        append the winner to result
-    append remaining elements
-    return result
-```
-
-**Time Complexity:** O(n log n) -- divide and conquer halves the problem at each level
-**Space Complexity:** O(n) -- temporary arrays during merge phase
-
-**Why not use built-in sort?** This implements comparison-based sorting from first principles, demonstrating understanding of recursive divide-and-conquer algorithms. Used specifically for ranking routes by popularity instead of Python's `sorted()` or `list.sort()`.
-
-### IQR Outlier Detection (`backend/src/utils/algorithms.py`)
-
-Detects anomalous trips using the Interquartile Range method with custom median calculation (no numpy/pandas dependency).
-
-```
-function detect_outliers_iqr(values):
-    sorted_vals = merge_sort(values)
-    q1 = median(lower_half)
-    q3 = median(upper_half)
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    return indices where values[i] < lower or > upper
-```
-
-**Time Complexity:** O(n log n) -- dominated by sort
-**Space Complexity:** O(n)
-
-**Application:** Identifies unusually expensive fares, extremely long trips, or anomalous speeds that may indicate data entry errors or special events.
 
 ## API Endpoints
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/kpi` | KPI summary (total trips, revenue, avg fare/distance/duration/speed) |
+| `GET /api/kpi` | KPI summary with total trips, revenue, and averages for fare, distance, duration, and speed |
 | `GET /api/trips-by-hour` | Hourly trip volume and average fare |
 | `GET /api/trips-by-day` | Trip volume by day of week |
-| `GET /api/trips-by-month` | Monthly trip and revenue totals |
+| `GET /api/trips-by-month` | Monthly trip counts and revenue totals |
 | `GET /api/top-pickup-locations?limit=N` | Top N pickup zones |
 | `GET /api/top-dropoff-locations?limit=N` | Top N dropoff zones |
-| `GET /api/revenue-by-borough` | Revenue, trip count, avg fare by borough |
-| `GET /api/payment-types` | Payment method distribution and revenue |
-| `GET /api/tip-analysis` | Tip percentage buckets with counts/averages |
-| `GET /api/top-routes?limit=N` | Most popular zone-to-zone routes |
+| `GET /api/revenue-by-borough` | Revenue, trip count, and average fare by borough |
+| `GET /api/payment-types` | Payment method distribution and revenue breakdown |
+| `GET /api/tip-analysis` | Tip percentage buckets with counts and averages |
+| `GET /api/top-routes?limit=N` | Most popular pickup-to-dropoff routes |
 | `GET /api/trip-count` | Total number of trip records |
-| `GET /api/trips?min_date=&max_date=&min_fare=&max_fare=&pulocation=&dolocation=&limit=N` | Filtered trip data |
+| `GET /api/trips?min_date=&max_date=&min_fare=&max_fare=&pulocation=&dolocation=&limit=N` | Filtered trip data query |
 | `GET /api/pipeline-log` | Data cleaning and ETL pipeline log |
 
-## Dashboard Features
+## Notes
 
-| Page | Content |
-|---|---|
-| **Overview** | 8 KPI cards (trips, revenue, avg fare/distance/duration/tip/passengers/speed), hourly line chart, daily bar chart, monthly dual chart (trips + revenue), revenue by borough |
-| **Locations** | Top 15 pickup zones, top 15 dropoff zones, top 20 routes (horizontal bar charts), route details table |
-| **Financial** | Payment type distribution (doughnut charts for count + revenue), tip percentage buckets, vendor comparison |
-| **Explore Trips** | Multi-filter search (date range, fare range, distance range), results table with 13 columns |
-| **Data Log** | Pipeline cleaning log with timestamps, stages, descriptions, record counts |
+- The backend serves both the API and the frontend assets.
+- Data files are expected to be loaded through the ETL pipeline before the dashboard is fully functional.
+- The schema is designed for analytics and can be lifted into MySQL if the dataset grows.
 
-## Key Insights (Urban Mobility Patterns)
-
-1. **Manhattan Dominance**: Over 80% of trips originate or terminate in Manhattan, reflecting its role as NYC's economic and tourist center. Brooklyn and Queens follow, while Staten Island and the Bronx contribute minimally.
-
-2. **Diurnal Rhythm**: Trip volume peaks at 6-8 PM (evening rush + leisure) and dips at 4-6 AM. Weekend patterns shift later, with peaks at 2-3 AM reflecting nightlife activity.
-
-3. **Credit Card Economy**: Credit card payments account for ~63% of trips and ~72% of revenue, suggesting card users take longer/more expensive trips on average.
-
-4. **Tip Behavior**: ~40% of cash trips have zero tip, while credit card trips tip at 18-22% on average, consistent with card-present payment prompts.
-
-5. **Airport Economics**: JFK and LaGuardia airport trips generate the highest average fares ($52 flat rate for JFK) but lower tip percentages, suggesting business travelers and fixed-price routes.
-
-## Rubric Coverage
-
-| Criterion | Coverage |
-|---|---|
-| Backend Logic & Data Handling | Data cleaning pipeline with 10+ validation rules, 8 derived features, robust error handling, bulk insert ETL |
-| System Architecture & Database | Normalized star schema (5 tables, 7 indexes), clear separation of concerns, architecture diagram above |
-| Frontend UI & Insight Presentation | 5-page SPA with Chart.js visualizations, interactive filters, responsive design, insight annotations |
-| Algorithm / DSA Implementation | Custom merge sort (O(n log n)) + IQR outlier detection, both with pseudo-code and complexity analysis |
-| Code Quality & README | Modular codebase (14 source files), comprehensive README with setup, architecture, API docs, and justifications |
-| Video Walkthrough | (Link to video walkthrough) |
-| Product Quality & Storytelling | Real NYC mobility data, professional UI, urban mobility insights, borough-level analysis |
-| Documentation | Technical report (submitted separately) accompanying this codebase |

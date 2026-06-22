@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NYC Taxi Analytics</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1>NYC Taxi</h1>
+            <p class="sidebar-subtitle">Analytics Dashboard</p>
+        </div>
+        <nav class="nav">
+            <button class="nav-item active" data-page="overview">Overview</button>
+            <button class="nav-item" data-page="locations">Locations</button>
+            <button class="nav-item" data-page="financial">Financial</button>
+            <button class="nav-item" data-page="explore">Explore Trips</button>
+            <button class="nav-item" data-page="pipeline">Data Log</button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="trip-count" id="tripCount">- trips</div>
+        </div>
+    </aside>
+
+    <main class="main-content" id="mainContent">
+        <div id="page-overview" class="page active"></div>
+        <div id="page-locations" class="page"></div>
+        <div id="page-financial" class="page"></div>
+        <div id="page-explore" class="page"></div>
+        <div id="page-pipeline" class="page"></div>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
